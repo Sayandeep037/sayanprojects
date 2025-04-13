@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="card">
+        <div class="search">
+            <input type="text" placeholder="enter city name" spellcheck="false">
+            <button><img src="images/search.png"></button>
+        </div>
+        <div class="error">
+            <p>Invalid city name</p>
+        </div>
+        <div class="weather">
+            <div class="current-weather">
+                <img src="images/rain.png" class="weather-icon">
+                <h1 class="temp">22°c</h1>
+                <h2 class="city">New York</h2>
+                <div class="details">
+                    <div class="col">
+                        <img src="images/humidity.png">
+                        <div>
+                            <p class="humidity">50%</p>
+                            <p>Humidity</p>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <img src="images/wind.png">
+                        <div>
+                            <p class="wind">15 Km/h</p>
+                            <p>Wind Speed</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="forecast">
+                <h3>5-Day Forecast</h3>
+                <div class="forecast-container"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const apiKey = "231581783d2cd3a9895118b4a77e8f6d";
+        const weatherApiUrl = "https://api.openweathermap.org/data/2.5/weather?units=metric&q=";
+        const forecastApiUrl = "https://api.openweathermap.org/data/2.5/forecast?units=metric&q=";
+        const searchBox = document.querySelector(".search input");
+        const searchBtn = document.querySelector(".search button");
+        const weatherIcon = document.querySelector(".weather-icon");
+        async function checkWeather(city) {
+            try {
+                const [weatherResponse, forecastResponse] = await Promise.all([
+                    fetch(weatherApiUrl + city + `&appid=${apiKey}`),
+                    fetch(forecastApiUrl + city + `&appid=${apiKey}`)
+                ]);
+
+                if (weatherResponse.status === 404 || forecastResponse.status === 404) {
+                    document.querySelector(".error").style.display = "block";
+                    document.querySelector(".weather").style.display = "none";
+                    return;
+                }
+
+                const weatherData = await weatherResponse.json();
+                const forecastData = await forecastResponse.json();
+
+                updateCurrentWeather(weatherData);
+                updateForecast(forecastData);
+                updateBackground(weatherData.weather[0].main);
+
+                document.querySelector(".weather").style.display = "block";
+                document.querySelector(".error").style.display = "none";
+            } catch (error) {
+                console.error("Error fetching weather data:", error);
+            }
+        }
+
+        function updateCurrentWeather(data) {
+            document.querySelector(".city").innerHTML = data.name;
+            document.querySelector(".temp").innerHTML = Math.round(data.main.temp) + "°c";
+            document.querySelector(".humidity").innerHTML = data.main.humidity + "%";
+            document.querySelector(".wind").innerHTML = data.wind.speed + "km/h";
+
+            const weatherMain = data.weather[0].main;
+            const iconMap = {
+                Clouds: "clouds.png",
+                Clear: "clear.png",
+                Rain: "rain.png",
+                Drizzle: "drizzle.png",
+                Mist: "mist.png",
+                Snow: "snow.png"
+            };
+            weatherIcon.src = `images/${iconMap[weatherMain] || "clear.png"}`;
+        }
+
+        function updateForecast(data) {
+            const forecastContainer = document.querySelector(".forecast-container");
+            forecastContainer.innerHTML = "";
+            
+            const dailyForecasts = data.list.filter((item, index) => index % 8 === 0).slice(0, 5);
+            
+            dailyForecasts.forEach(day => {
+                const date = new Date(day.dt * 1000);
+                const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
+                const temp = Math.round(day.main.temp);
+                const weatherMain = day.weather[0].main;
+                const iconMap = {
+                    Clouds: "clouds.png",
+                    Clear: "clear.png",
+                    Rain: "rain.png",
+                    Drizzle: "drizzle.png",
+                    Mist: "mist.png",
+                    Snow: "snow.png"
+                };
+                
+                const forecastCard = `
+                    <div class="forecast-day">
+                        <p>${dayName}</p>
+                        <img src="images/${iconMap[weatherMain] || "clear.png"}" alt="${weatherMain}">
+                        <p>${temp}°c</p>
+                    </div>
+                `;
+                forecastContainer.innerHTML += forecastCard;
+            });
+        }
+
+        function updateBackground(weatherCondition) {
+            const card = document.querySelector(".card");
+            const hour = new Date().getHours();
+            const isNight = hour >= 18 || hour < 6;
+
+            const backgrounds = {
+                Clear: isNight ? "url('images/backgrounds/clear-night.svg')" : "url('images/backgrounds/clear.svg')",
+                Clouds: isNight ? "url('images/backgrounds/clouds-night.svg')" : "url('images/backgrounds/clouds.svg')",
+                Rain: isNight ? "url('images/backgrounds/rain-night.svg')" : "url('images/backgrounds/rain.svg')",
+                Drizzle: isNight ? "url('images/backgrounds/rain-night.svg')" : "url('images/backgrounds/rain.svg')",
+                Snow: isNight ? "url('images/backgrounds/snow-night.svg')" : "url('images/backgrounds/snow.svg')",
+                Mist: isNight ? "url('images/backgrounds/clouds-night.svg')" : "url('images/backgrounds/clouds.svg')"
+            };
+            card.style.transition = "background 1s ease-in-out";
+            card.style.background = backgrounds[weatherCondition] || (isNight ? backgrounds.Clear : backgrounds.Clear);
+            card.style.backgroundSize = "cover";
+            card.style.backgroundPosition = "center";
+            card.style.backgroundRepeat = "no-repeat";
+        }
+
+        // Auto-refresh weather data every 5 minutes
+        function startAutoRefresh() {
+            if (searchBox.value) {
+                checkWeather(searchBox.value);
+            }
+        }
+        setInterval(startAutoRefresh, 300000);
+
+        searchBtn.addEventListener("click", () => {
+            checkWeather(searchBox.value);
+        });
+
+        // Add enter key support
+        searchBox.addEventListener("keypress", (event) => {
+            if (event.key === "Enter") {
+                checkWeather(searchBox.value);
+            }
+        });
+
+    </script>
+</body>
+
+</html>
